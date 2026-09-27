@@ -4,7 +4,7 @@ Un regalo de cumpleaños con portada en vino y champagne, álbum de recuerdos, c
 
 ## Personalizar sin tocar código
 
-Abre la dirección publicada seguida de `/admin` e inicia sesión en ChatGPT con **pierogamer3@gmail.com**. Esa es la única cuenta autorizada por la aplicación. Si el sitio sigue privado, esa cuenta también necesita acceso en la configuración de compartir de Sites.
+Abre la dirección publicada seguida de `/admin` e ingresa la **contraseña del panel** (`ADMIN_PASSWORD` en Vercel). Solo quien tenga esa contraseña puede editar el rincón.
 
 - **Recuerdos:** carga múltiples fotos, videos y GIF. Arrastra tarjetas para ordenar o usa las flechas; el ojo oculta un recuerdo sin eliminarlo. Edita sus títulos, mensajes y fechas con el lápiz.
 - **GIF:** conserva los archivos animados originales. Admite archivo o URL HTTPS directa; no incluye GIF de Chiikawa de terceros.
@@ -23,7 +23,7 @@ La fecha inicial es **27 de septiembre de 2026, 00:00, America/Lima**, equivalen
 
 ## Archivos y privacidad
 
-La persistencia publicada usa **Cloudflare D1 y R2 administrados por Sites**, en lugar de Supabase. La autenticación usa ChatGPT y una autorización adicional del correo administrador en el servidor. No hay claves privadas en el cliente ni almacenamiento de recuerdos en localStorage.
+En Vercel, los datos viven en **Turso** (SQLite) y los archivos en **Vercel Blob**. El panel usa sesión con contraseña (`ADMIN_PASSWORD` + `AUTH_SECRET`). No hay claves privadas en el cliente ni almacenamiento de recuerdos en localStorage.
 
 Límite por archivo: **95 MB**. Las fotos se optimizan a WebP con miniatura de 720 px y versión de hasta 2200 px. Los GIF se conservan sin recomprimir. Los videos se cargan al abrirlos; se extrae una miniatura en el navegador cuando el formato lo permite y se puede cargar otra manualmente. Los videos conservan su formato original: algunos MOV de iPhone/HEVC no se reproducen en todos los navegadores; exportar a MP4 H.264 ofrece mayor compatibilidad. No se incluye transcodificación de video.
 
@@ -35,15 +35,16 @@ El álbum comienza sin fotos ni videos personales. La imagen de la rosa es decor
 
 ## Desarrollo y despliegue
 
-React 19, TypeScript, Vinext (estructura App Router compatible con Next.js), Tailwind 4, primitivas accesibles Radix. Animaciones CSS con soporte para movimiento reducido. Este adaptador de producción está preparado para **Sites / Cloudflare Workers**. Para Vercel se necesita sustituir los adaptadores D1/R2 y la autenticación por servicios compatibles, por ejemplo Supabase; no se afirma compatibilidad directa con Vercel.
+React 19, TypeScript, Next.js App Router, Tailwind 4, primitivas accesibles Radix. Animaciones CSS con soporte para movimiento reducido. Producción en **Vercel** con **Turso** (SQLite) y **Vercel Blob** para archivos. El flujo Sites/Cloudflare sigue disponible con `npm run dev:sites` y `npm run build:sites`.
 
 ```sh
 npm ci
+cp .env.example .env.local
+npm run db:push
 npm run dev
-npm run db:generate
 npm run build
 ```
 
-Define `ADMIN_EMAIL` como variable del servidor; para el entorno publicado se gestiona en Sites. No guardes credenciales en el código. El esquema está en `db/schema.ts` y la migración inicial en `drizzle/`. El entorno local normal de Sites simula el inicio de sesión con `seedy@sites.test`; configura únicamente ese correo en las variables locales para pruebas. No lo uses en producción.
+Variables en Vercel (y en `.env.local`): `TURSO_DATABASE_URL`, `TURSO_AUTH_TOKEN` (Turso en producción), `BLOB_READ_WRITE_TOKEN`, `ADMIN_PASSWORD`, `AUTH_SECRET` (mín. 16 caracteres). El panel `/admin` usa contraseña, no ChatGPT. El esquema está en `db/schema.ts` y las migraciones en `drizzle/`.
 
 La carpeta ignorada `.sites-runtime` contiene herramientas y datos de verificación locales. No se publica y no contiene recuerdos del usuario.

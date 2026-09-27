@@ -1,3 +1,4 @@
 import {getContent,isAdmin,responseHeaders} from '@/lib/server';
-export const dynamic='force-dynamic';
+export const dynamic = "force-dynamic";
+export const runtime = "nodejs";
 export async function GET(req:Request){try{const preview=new URL(req.url).searchParams.get('preview')==='1'; if(preview&&!await isAdmin()) return Response.json({error:'Acceso privado.'},{status:403,headers:responseHeaders});return Response.json(await getContent(preview),{headers:responseHeaders});}catch(e){console.error('Content unavailable',e);return Response.json({error:'No pudimos abrir nuestros recuerdos. Inténtalo de nuevo.'},{status:503,headers:responseHeaders});}}

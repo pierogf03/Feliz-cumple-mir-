@@ -1,7 +1,8 @@
 import {z} from 'zod';
 import {authorize,db,getSettings,responseHeaders,removeUnreferenced} from '@/lib/server';
 import {defaults,defaultReasons} from '@/lib/content';
-export const dynamic='force-dynamic';
+export const dynamic = "force-dynamic";
+export const runtime = "nodejs";
 const safeUrl=z.string().max(2048).refine(v=>!v||/^\/api\/media\/[a-f0-9-]{36}$/.test(v)||v==='/romantic-rose-letter.webp'||(()=>{try{const u=new URL(v);return u.protocol==='https:'&&!u.username&&!u.password;}catch{return false;}})(),'Usa una URL HTTPS directa al archivo.');
 const date=z.string().refine(v=>!v||(/^\d{4}-\d{2}-\d{2}$/.test(v)&&!isNaN(Date.parse(v))),'Fecha inválida.');
 const memory=z.object({id:z.string().min(1).max(80),type:z.enum(['photo','video','gif','text']),media_url:safeUrl,thumbnail_url:safeUrl,title:z.string().max(180),description:z.string().max(4000),date,sort_order:z.number().int().min(0).max(10000),visible:z.union([z.literal(0),z.literal(1)]),style:z.enum(['paper','wine']),size:z.enum(['small','medium','large'])}).refine(m=>m.type==='text'?!!(m.title.trim()||m.description.trim()):!!m.media_url,'Agrega un archivo o una frase.');

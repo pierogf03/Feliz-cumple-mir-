@@ -18,6 +18,9 @@
 /.vinext/
 /out/
 
+# local Turso sqlite file
+/.data/
+
 # misc
 .DS_Store
 *.pem
