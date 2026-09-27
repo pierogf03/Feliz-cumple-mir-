@@ -4,7 +4,7 @@ Un regalo de cumpleaños con portada en vino y champagne, álbum de recuerdos, c
 
 ## Personalizar sin tocar código
 
-Abre la dirección publicada seguida de `/admin` e ingresa la **contraseña del panel** (`ADMIN_PASSWORD` en Vercel). Solo quien tenga esa contraseña puede editar el rincón.
+Abre la dirección publicada seguida de `/admin` e ingresa la contraseña **`admin`** (o la que definas en `ADMIN_PASSWORD`).
 
 - **Recuerdos:** carga múltiples fotos, videos y GIF. Arrastra tarjetas para ordenar o usa las flechas; el ojo oculta un recuerdo sin eliminarlo. Edita sus títulos, mensajes y fechas con el lápiz.
 - **GIF:** conserva los archivos animados originales. Admite archivo o URL HTTPS directa; no incluye GIF de Chiikawa de terceros.
