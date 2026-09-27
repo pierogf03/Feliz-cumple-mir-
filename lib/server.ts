@@ -5,20 +5,33 @@ import {
   setAdminSession,
   verifyAdminPassword,
 } from "@/lib/admin-auth";
-import { db } from "@/lib/sqlite";
 import { bucket } from "@/lib/storage";
-import {
-  defaults,
-  defaultReasons,
-  type Content,
-  type Settings,
-  type Memory,
-  type Moment,
-  type Reason,
-} from "./content";
+import { defaultReasons, type Content, type Settings } from "./content";
+import * as store from "./store";
 
-export { isAdmin, createSessionToken, setAdminSession, clearAdminSession, verifyAdminPassword };
-export { db, bucket };
+export {
+  isAdmin,
+  createSessionToken,
+  setAdminSession,
+  clearAdminSession,
+  verifyAdminPassword,
+};
+export { bucket };
+export {
+  ensureStore,
+  saveSettings,
+  upsertMemory,
+  deleteMemory,
+  reorderMemories,
+  upsertTimeline,
+  deleteTimeline,
+  reorderTimeline,
+  upsertReason,
+  deleteReason,
+  reorderReasons,
+  registerAsset,
+  isMediaUrlPublic,
+} from "./store";
 
 export async function authorize(req: Request) {
   if (!(await isAdmin()))
@@ -32,14 +45,12 @@ export async function authorize(req: Request) {
 }
 
 export async function getSettings(): Promise<Settings> {
-  const row = await db()
-    .prepare("SELECT value FROM settings WHERE id=1")
-    .first<{ value: string }>();
-  return { ...defaults, ...(row ? JSON.parse(row.value) : {}) };
+  return store.getSettings();
 }
 
 export async function getContent(admin = false): Promise<Content> {
-  const settings = await getSettings();
+  await store.ensureStore();
+  const settings = await store.getSettings();
   const serverTime = Date.now();
   const unlocked = serverTime >= Date.parse(settings.birthday_date);
   if (!admin && !unlocked)
@@ -51,27 +62,15 @@ export async function getContent(admin = false): Promise<Content> {
       timeline: [],
       reasons: [],
     };
-  const results = await db().batch([
-    db().prepare(
-      `SELECT * FROM memories ${admin ? "" : "WHERE visible=1"} ORDER BY sort_order,created_at`,
-    ),
-    db().prepare("SELECT * FROM timeline ORDER BY sort_order,id"),
-    db().prepare("SELECT * FROM love_reasons ORDER BY sort_order,id"),
-    db().prepare("SELECT value FROM settings WHERE id=1"),
-  ]);
-  const configured = results[3].results.length > 0;
+  const configured = await store.hasConfiguredReasons();
   return {
     settings,
     serverTime,
     unlocked,
-    memories: results[0].results as unknown as Memory[],
+    memories: await store.listMemories(admin),
     timeline:
-      settings.timeline_enabled || admin
-        ? (results[1].results as unknown as Moment[])
-        : [],
-    reasons: configured
-      ? (results[2].results as unknown as Reason[])
-      : defaultReasons,
+      settings.timeline_enabled || admin ? await store.listTimeline() : [],
+    reasons: configured ? await store.listReasons() : defaultReasons,
   };
 }
 
@@ -81,24 +80,12 @@ export const responseHeaders = {
 };
 
 export async function removeUnreferenced(urls: string[]) {
-  const settings = await getSettings();
+  const settings = await store.getSettings();
   for (const url of new Set(urls)) {
-    if (
-      !/^\/api\/media\/[a-f0-9-]{36}$/.test(url) ||
-      url === settings.cover_url ||
-      url === settings.audio_url
-    )
-      continue;
-    const linked = await db()
-      .prepare(
-        "SELECT id FROM memories WHERE media_url=? OR thumbnail_url=? UNION ALL SELECT id FROM timeline WHERE media_url=? LIMIT 1",
-      )
-      .bind(url, url, url)
-      .first();
-    if (!linked) {
-      const id = url.split("/").pop()!;
-      await bucket().delete(id);
-      await db().prepare("DELETE FROM assets WHERE id=?").bind(id).run();
-    }
+    if (!/^\/api\/media\/[a-f0-9-]{36}$/.test(url)) continue;
+    if (await store.isMediaUrlReferenced(url, settings)) continue;
+    const id = url.split("/").pop()!;
+    await bucket().delete(id).catch(() => {});
+    await store.removeAsset(id);
   }
 }
