@@ -83,23 +83,23 @@ async function readStore(): Promise<StoreData> {
     return { ...emptyStore(), ...JSON.parse(raw) };
   }
 
-  if (!canUseLocalDisk()) {
-    return ephemeral ?? emptyStore();
-  }
-
-  await mkdir(dataRoot, { recursive: true });
   try {
     const raw = await readFile(STORE_FILE, "utf8");
     return { ...emptyStore(), ...JSON.parse(raw) };
   } catch {
+    if (!canUseLocalDisk()) return ephemeral ?? emptyStore();
     return emptyStore();
   }
 }
 
 async function writeStore(data: StoreData) {
-  if (useBlobPersistence()) {
-    requireBlobTokenForWrites();
+  if (useBlobPersistence() && hasBlobToken()) {
     await writeBlobText(BLOB_STORE_PATH, JSON.stringify(data));
+    return;
+  }
+
+  if (!canUseLocalDisk()) {
+    requireBlobTokenForWrites();
     return;
   }
 

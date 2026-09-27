@@ -35,16 +35,14 @@ El álbum comienza sin fotos ni videos personales. La imagen de la rosa es decor
 
 ## Desarrollo y despliegue
 
-React 19, TypeScript, Next.js App Router, Tailwind 4, primitivas accesibles Radix. Animaciones CSS con soporte para movimiento reducido. Producción en **Vercel** con **Turso** (SQLite) y **Vercel Blob** para archivos. El flujo Sites/Cloudflare sigue disponible con `npm run dev:sites` y `npm run build:sites`.
+React 19, TypeScript, Next.js App Router, Tailwind 4, primitivas accesibles Radix. El contenido del regalo vive en **`.data/store.json`** y **`.data/media/`** (versionado en git). En Vercel se sirve ese mismo bundle; opcionalmente `BLOB_READ_WRITE_TOKEN` si quieres editar en producción.
 
 ```sh
 npm ci
-cp .env.example .env.local
-npm run db:push
 npm run dev
 npm run build
 ```
 
-Variables en Vercel (y en `.env.local`): `TURSO_DATABASE_URL`, `TURSO_AUTH_TOKEN` (Turso en producción), `BLOB_READ_WRITE_TOKEN`, `ADMIN_PASSWORD`, `AUTH_SECRET` (mín. 16 caracteres). El panel `/admin` usa contraseña, no ChatGPT. El esquema está en `db/schema.ts` y las migraciones en `drizzle/`.
+Panel `/admin`: contraseña **`admin`**. Para probar en la red local: `npm run dev:lan` (solo mientras desarrollas; luego detén el servidor).
 
 La carpeta ignorada `.sites-runtime` contiene herramientas y datos de verificación locales. No se publica y no contiene recuerdos del usuario.

@@ -146,6 +146,8 @@ function vercelBucket() {
   };
 }
 
+/** Archivos en `.data/media/` (local o empaquetados en el deploy desde git). */
 export function bucket() {
-  return useVercelBlob() ? vercelBucket() : localBucket();
+  if (useVercelBlob()) return vercelBucket();
+  return localBucket();
 }

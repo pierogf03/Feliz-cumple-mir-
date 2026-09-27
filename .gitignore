@@ -18,8 +18,9 @@
 /.vinext/
 /out/
 
-# local Turso sqlite file
-/.data/
+# SQLite local (no versionar)
+/.data/*.db
+/.data/*.db-*
 
 # misc
 .DS_Store

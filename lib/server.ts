@@ -5,6 +5,7 @@ import {
   setAdminSession,
   verifyAdminPassword,
 } from "@/lib/admin-auth";
+import { isAllowedRequestOrigin } from "@/lib/request-origin";
 import { bucket } from "@/lib/storage";
 import { defaultReasons, type Content, type Settings } from "./content";
 import * as store from "./store";
@@ -39,7 +40,7 @@ export async function authorize(req: Request) {
       { error: "No tienes permiso para editar este rincón." },
       { status: 403 },
     );
-  if (req.headers.get("origin") !== new URL(req.url).origin)
+  if (!isAllowedRequestOrigin(req))
     return Response.json({ error: "Origen no permitido." }, { status: 403 });
   return null;
 }
