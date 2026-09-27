@@ -1,7 +1,6 @@
 import { createReadStream, createWriteStream } from "node:fs";
 import { unlink, writeFile, stat, open, readFile } from "node:fs/promises";
 import { Readable } from "node:stream";
-import { pipeline } from "node:stream/promises";
 import { del, head, put } from "@vercel/blob";
 import { ensureDataDirs, localMediaPath } from "@/lib/local-paths";
 
@@ -43,7 +42,8 @@ function localBucket() {
       if (!body) throw new Error("Empty body");
       await ensureDataDirs();
       const path = localMediaPath(id);
-      await pipeline(Readable.fromWeb(body), createWriteStream(path));
+      const buffer = Buffer.from(await new Response(body).arrayBuffer());
+      await writeFile(path, buffer);
       await writeFile(
         metaPath(id),
         JSON.stringify({

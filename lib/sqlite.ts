@@ -4,7 +4,9 @@ import {
   resolveDatabaseUrl,
   usesRemoteDatabase,
 } from "@/lib/db-init";
-import { nativeDb, NativePreparedStatement } from "@/lib/sqlite-native";
+import type { SqlDatabase, SqlStatement } from "@/lib/db-types";
+import { runBatch } from "@/lib/db-types";
+import { nativeDb } from "@/lib/sqlite-native";
 
 let client: Client | undefined;
 let ready: Promise<void> | undefined;
@@ -21,14 +23,18 @@ async function getRemoteClient(): Promise<Client> {
   return client;
 }
 
-export class PreparedStatement {
+class RemotePreparedStatement implements SqlStatement {
   constructor(
     private readonly sql: string,
     private readonly args: unknown[] = [],
   ) {}
 
+  isSelect() {
+    return this.sql.trim().toUpperCase().startsWith("SELECT");
+  }
+
   bind(...args: unknown[]) {
-    return new PreparedStatement(this.sql, args);
+    return new RemotePreparedStatement(this.sql, args);
   }
 
   async first<T>(): Promise<T | null> {
@@ -48,34 +54,24 @@ export class PreparedStatement {
   }
 
   async run(): Promise<void> {
-    await this.execute();
-  }
-
-  async execute() {
-    return (await getRemoteClient()).execute({
+    await (await getRemoteClient()).execute({
       sql: this.sql,
       args: this.args as (string | number | null)[],
     });
   }
 }
 
-export function db() {
-  if (!usesRemoteDatabase()) {
-    return nativeDb();
-  }
+function remoteDb(): SqlDatabase {
   return {
     prepare(sql: string) {
-      return new PreparedStatement(sql);
+      return new RemotePreparedStatement(sql);
     },
-    async batch(stmts: PreparedStatement[]) {
-      const results: { results: unknown[] }[] = [];
-      for (const stmt of stmts) {
-        const rs = await stmt.execute();
-        results.push({ results: rs.rows });
-      }
-      return results;
+    batch(stmts: SqlStatement[]) {
+      return runBatch(stmts);
     },
   };
 }
 
-export type DbPreparedStatement = PreparedStatement | NativePreparedStatement;
+export function db(): SqlDatabase {
+  return usesRemoteDatabase() ? remoteDb() : nativeDb();
+}

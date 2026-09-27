@@ -1,6 +1,8 @@
 import { mkdirSync } from "node:fs";
 import Database from "better-sqlite3";
 import { ensureNativeSchema } from "@/lib/db-init";
+import type { SqlDatabase, SqlStatement } from "@/lib/db-types";
+import { runBatch } from "@/lib/db-types";
 import { dataRoot, localDatabasePath } from "@/lib/local-paths";
 
 let db: Database.Database | undefined;
@@ -17,11 +19,15 @@ function getNativeDatabase() {
 
 type SqlValue = string | number | null;
 
-export class NativePreparedStatement {
+class NativePreparedStatement implements SqlStatement {
   constructor(
     private readonly sql: string,
     private readonly args: SqlValue[] = [],
   ) {}
+
+  isSelect() {
+    return this.sql.trim().toUpperCase().startsWith("SELECT");
+  }
 
   bind(...args: SqlValue[]) {
     return new NativePreparedStatement(this.sql, args);
@@ -40,29 +46,15 @@ export class NativePreparedStatement {
   async run(): Promise<void> {
     getNativeDatabase().prepare(this.sql).run(...this.args);
   }
-
-  async execute() {
-    const result = getNativeDatabase().prepare(this.sql).run(...this.args);
-    return { rows: [] as unknown[], result };
-  }
 }
 
-export function nativeDb() {
+export function nativeDb(): SqlDatabase {
   return {
     prepare(sql: string) {
       return new NativePreparedStatement(sql);
     },
-    async batch(stmts: NativePreparedStatement[]) {
-      const results: { results: unknown[] }[] = [];
-      for (const stmt of stmts) {
-        if (stmt.sql.trim().toUpperCase().startsWith("SELECT")) {
-          results.push(await stmt.all());
-        } else {
-          await stmt.run();
-          results.push({ results: [] });
-        }
-      }
-      return results;
+    batch(stmts: SqlStatement[]) {
+      return runBatch(stmts);
     },
   };
 }
