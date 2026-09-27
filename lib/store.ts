@@ -10,6 +10,13 @@ import {
   type Settings,
 } from "@/lib/content";
 import { dataRoot } from "@/lib/local-paths";
+import {
+  canUseLocalDisk,
+  hasBlobToken,
+  isVercelRuntime,
+  requireBlobTokenForWrites,
+  useBlobPersistence,
+} from "@/lib/runtime-env";
 
 export type Asset = {
   id: string;
@@ -30,6 +37,8 @@ type StoreData = {
 const STORE_FILE = join(dataRoot, "store.json");
 const BLOB_STORE_PATH = "store.json";
 
+let ephemeral: StoreData | null = null;
+
 function emptyStore(): StoreData {
   return {
     settings: { ...defaults },
@@ -39,10 +48,6 @@ function emptyStore(): StoreData {
     assets: [],
     seeded: false,
   };
-}
-
-function useBlobStore() {
-  return Boolean(process.env.BLOB_READ_WRITE_TOKEN?.trim());
 }
 
 function blobToken() {
@@ -72,11 +77,16 @@ async function writeBlobText(pathname: string, text: string) {
 }
 
 async function readStore(): Promise<StoreData> {
-  if (useBlobStore()) {
+  if (useBlobPersistence() && hasBlobToken()) {
     const raw = await readBlobText(BLOB_STORE_PATH);
     if (!raw) return emptyStore();
     return { ...emptyStore(), ...JSON.parse(raw) };
   }
+
+  if (!canUseLocalDisk()) {
+    return ephemeral ?? emptyStore();
+  }
+
   await mkdir(dataRoot, { recursive: true });
   try {
     const raw = await readFile(STORE_FILE, "utf8");
@@ -87,15 +97,17 @@ async function readStore(): Promise<StoreData> {
 }
 
 async function writeStore(data: StoreData) {
-  const text = JSON.stringify(data);
-  if (useBlobStore()) {
-    await writeBlobText(BLOB_STORE_PATH, text);
+  if (useBlobPersistence()) {
+    requireBlobTokenForWrites();
+    await writeBlobText(BLOB_STORE_PATH, JSON.stringify(data));
     return;
   }
+
   await mkdir(dataRoot, { recursive: true });
   const tmp = `${STORE_FILE}.${process.pid}.tmp`;
-  await writeFile(tmp, text, "utf8");
+  await writeFile(tmp, JSON.stringify(data), "utf8");
   await rename(tmp, STORE_FILE);
+  ephemeral = data;
 }
 
 export async function ensureStore() {
@@ -104,6 +116,10 @@ export async function ensureStore() {
   store.settings = { ...defaults };
   store.reasons = defaultReasons.map((r) => ({ ...r }));
   store.seeded = true;
+  if (isVercelRuntime() && !hasBlobToken()) {
+    ephemeral = store;
+    return;
+  }
   await writeStore(store);
 }
 
@@ -275,7 +291,9 @@ export async function isMediaUrlPublic(
 export async function isMediaUrlReferenced(url: string, settings: Settings) {
   if (url === settings.cover_url || url === settings.audio_url) return true;
   const store = await readStore();
-  return store.memories.some(
-    (m) => m.media_url === url || m.thumbnail_url === url,
-  ) || store.timeline.some((t) => t.media_url === url);
+  return (
+    store.memories.some(
+      (m) => m.media_url === url || m.thumbnail_url === url,
+    ) || store.timeline.some((t) => t.media_url === url)
+  );
 }

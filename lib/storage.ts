@@ -3,6 +3,12 @@ import { unlink, writeFile, stat, open, readFile } from "node:fs/promises";
 import { Readable } from "node:stream";
 import { del, head, put } from "@vercel/blob";
 import { ensureDataDirs, localMediaPath } from "@/lib/local-paths";
+import {
+  canUseLocalDisk,
+  hasBlobToken,
+  requireBlobTokenForWrites,
+  useBlobPersistence,
+} from "@/lib/runtime-env";
 
 type PutOptions = {
   httpMetadata?: { contentType?: string };
@@ -10,7 +16,7 @@ type PutOptions = {
 };
 
 function useVercelBlob() {
-  return Boolean(process.env.BLOB_READ_WRITE_TOKEN?.trim());
+  return useBlobPersistence() && hasBlobToken();
 }
 
 function blobToken() {
@@ -40,6 +46,9 @@ function localBucket() {
       opts?: PutOptions,
     ) {
       if (!body) throw new Error("Empty body");
+      if (!canUseLocalDisk()) {
+        requireBlobTokenForWrites();
+      }
       await ensureDataDirs();
       const path = localMediaPath(id);
       const buffer = Buffer.from(await new Response(body).arrayBuffer());
