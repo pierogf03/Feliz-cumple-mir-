@@ -1,0 +1,10 @@
+export const MESSAGE = 'FELIZ CUMPLEAÑOS PRECIOSITA DE MI CORAZÓN ❤️';
+export type Memory = {id:string;type:'photo'|'video'|'gif'|'text';media_url:string;thumbnail_url:string;title:string;description:string;date:string;sort_order:number;visible:number;style:string;size:string;created_at?:string};
+export type Moment = {id:string;date:string;title:string;description:string;media_url:string;sort_order:number};
+export type Reason = {id:string;text:string;sort_order:number};
+export type Settings = {birthday_date:string;main_message:string;intro:string;letter_content:string;audio_url:string;cover_url:string;timeline_enabled:boolean};
+export type Content = {settings:Settings;memories:Memory[];timeline:Moment[];reasons:Reason[];serverTime:number;unlocked:boolean};
+export const defaults: Settings = {birthday_date:'2026-09-27T00:00:00-05:00',main_message:MESSAGE,intro:'Una pequeña sorpresa para la persona que hace mis días más bonitos.',letter_content:'Mi preciosita:\n\nAquí empieza una carta que solo puede ser para ti. [Escribe aquí lo que quieres decirle, con tus palabras y todos sus recuerdos.]\n\n[Agrega tantos párrafos como quieras.]\n\nCon todo mi amor.',audio_url:'',cover_url:'/romantic-rose-letter.webp',timeline_enabled:true};
+export const defaultReasons: Reason[] = ['Tu sonrisa','Cómo me miras','Tu forma de hacerme reír','Tus ocurrencias','Cómo haces especiales los días normales'].map((text,i)=>({id:`reason-${i}`,text,sort_order:i}));
+export function remaining(target:string,now:number) {const n=Math.max(0,Math.ceil((Date.parse(target)-now)/1000)); return [Math.floor(n/86400),Math.floor(n/3600)%24,Math.floor(n/60)%60,n%60];}
+export function limaDate(value:string) {return new Intl.DateTimeFormat('es-PE',{timeZone:'America/Lima',day:'2-digit',month:'2-digit',year:'numeric'}).format(new Date(value)).replaceAll('/',' · ');}

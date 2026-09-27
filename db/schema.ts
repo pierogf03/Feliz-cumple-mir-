@@ -1,0 +1,8 @@
+import { sqliteTable, text, integer, index } from 'drizzle-orm/sqlite-core';
+export const memories = sqliteTable('memories', {
+ id: text('id').primaryKey(), type: text('type').notNull(), media_url: text('media_url').notNull().default(''), thumbnail_url: text('thumbnail_url').notNull().default(''), title: text('title').notNull().default(''), description: text('description').notNull().default(''), date: text('date').notNull().default(''), sort_order: integer('sort_order').notNull().default(0), visible: integer('visible').notNull().default(1), style: text('style').notNull().default('paper'), size: text('size').notNull().default('medium'), created_at: text('created_at').notNull()
+}, t => [index('memories_visible_order').on(t.visible,t.sort_order)]);
+export const timeline = sqliteTable('timeline', {id:text('id').primaryKey(),date:text('date').notNull().default(''),title:text('title').notNull(),description:text('description').notNull().default(''),media_url:text('media_url').notNull().default(''),sort_order:integer('sort_order').notNull().default(0)});
+export const loveReasons = sqliteTable('love_reasons', {id:text('id').primaryKey(),text:text('text').notNull(),sort_order:integer('sort_order').notNull().default(0)});
+export const settings = sqliteTable('settings', {id:integer('id').primaryKey(),value:text('value').notNull()});
+export const assets = sqliteTable('assets', {id:text('id').primaryKey(),mime:text('mime').notNull(),size:integer('size').notNull(),created_at:text('created_at').notNull()});
