@@ -5,8 +5,12 @@ import { redirect } from "next/navigation";
 const COOKIE = "admin_session";
 
 function secret() {
-  const value = process.env.AUTH_SECRET;
-  if (!value || value.length < 16) {
+  const value =
+    process.env.AUTH_SECRET?.trim() ||
+    (process.env.NODE_ENV !== "production"
+      ? "local-dev-auth-secret-min-16-chars"
+      : "");
+  if (value.length < 16) {
     throw new Error("AUTH_SECRET must be at least 16 characters.");
   }
   return new TextEncoder().encode(value);
@@ -55,7 +59,9 @@ export async function clearAdminSession(): Promise<void> {
 }
 
 export function verifyAdminPassword(password: string): boolean {
-  const expected = process.env.ADMIN_PASSWORD;
+  const expected =
+    process.env.ADMIN_PASSWORD?.trim() ||
+    (process.env.NODE_ENV !== "production" ? "admin" : "");
   if (!expected) return false;
   return password === expected;
 }

@@ -1,16 +1,23 @@
 import { createClient, type Client } from "@libsql/client";
+import {
+  ensureRemoteSchema,
+  resolveDatabaseUrl,
+  usesRemoteDatabase,
+} from "@/lib/db-init";
+import { nativeDb, NativePreparedStatement } from "@/lib/sqlite-native";
 
 let client: Client | undefined;
+let ready: Promise<void> | undefined;
 
-function getClient(): Client {
+async function getRemoteClient(): Promise<Client> {
   if (!client) {
-    const url = process.env.TURSO_DATABASE_URL;
-    if (!url) throw new Error("Database unavailable");
     client = createClient({
-      url,
+      url: resolveDatabaseUrl(),
       authToken: process.env.TURSO_AUTH_TOKEN || undefined,
     });
+    ready = ensureRemoteSchema(client);
   }
+  await ready;
   return client;
 }
 
@@ -25,7 +32,7 @@ export class PreparedStatement {
   }
 
   async first<T>(): Promise<T | null> {
-    const rs = await getClient().execute({
+    const rs = await (await getRemoteClient()).execute({
       sql: this.sql,
       args: this.args as (string | number | null)[],
     });
@@ -33,7 +40,7 @@ export class PreparedStatement {
   }
 
   async all<T>(): Promise<{ results: T[] }> {
-    const rs = await getClient().execute({
+    const rs = await (await getRemoteClient()).execute({
       sql: this.sql,
       args: this.args as (string | number | null)[],
     });
@@ -45,7 +52,7 @@ export class PreparedStatement {
   }
 
   async execute() {
-    return getClient().execute({
+    return (await getRemoteClient()).execute({
       sql: this.sql,
       args: this.args as (string | number | null)[],
     });
@@ -53,6 +60,9 @@ export class PreparedStatement {
 }
 
 export function db() {
+  if (!usesRemoteDatabase()) {
+    return nativeDb();
+  }
   return {
     prepare(sql: string) {
       return new PreparedStatement(sql);
@@ -67,3 +77,5 @@ export function db() {
     },
   };
 }
+
+export type DbPreparedStatement = PreparedStatement | NativePreparedStatement;

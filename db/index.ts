@@ -1,17 +1,26 @@
 import { createClient } from "@libsql/client";
-import { drizzle } from "drizzle-orm/libsql";
+import { drizzle as drizzleLibsql } from "drizzle-orm/libsql";
+import { drizzle as drizzleSqlite } from "drizzle-orm/better-sqlite3";
+import Database from "better-sqlite3";
+import {
+  resolveDatabaseUrl,
+  usesRemoteDatabase,
+  ensureNativeSchema,
+} from "@/lib/db-init";
+import { dataRoot, localDatabasePath } from "@/lib/local-paths";
+import { mkdirSync } from "node:fs";
 import * as schema from "./schema";
 
 export function getDb() {
-  const url = process.env.TURSO_DATABASE_URL;
-  if (!url) {
-    throw new Error(
-      "Set TURSO_DATABASE_URL (Turso in production or file:./.data/local.db locally).",
-    );
+  if (usesRemoteDatabase()) {
+    const client = createClient({
+      url: resolveDatabaseUrl(),
+      authToken: process.env.TURSO_AUTH_TOKEN || undefined,
+    });
+    return drizzleLibsql(client, { schema });
   }
-  const client = createClient({
-    url,
-    authToken: process.env.TURSO_AUTH_TOKEN || undefined,
-  });
-  return drizzle(client, { schema });
+  mkdirSync(dataRoot, { recursive: true });
+  const sqlite = new Database(localDatabasePath());
+  ensureNativeSchema(sqlite);
+  return drizzleSqlite(sqlite, { schema });
 }

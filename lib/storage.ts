@@ -1,17 +1,95 @@
+import { createReadStream, createWriteStream } from "node:fs";
+import { unlink, writeFile, stat, open, readFile } from "node:fs/promises";
+import { Readable } from "node:stream";
+import { pipeline } from "node:stream/promises";
 import { del, head, put } from "@vercel/blob";
-
-function token() {
-  const t = process.env.BLOB_READ_WRITE_TOKEN;
-  if (!t) throw new Error("Storage unavailable");
-  return t;
-}
+import { ensureDataDirs, localMediaPath } from "@/lib/local-paths";
 
 type PutOptions = {
   httpMetadata?: { contentType?: string };
   customMetadata?: Record<string, string>;
 };
 
-export function bucket() {
+function useVercelBlob() {
+  return Boolean(process.env.BLOB_READ_WRITE_TOKEN?.trim());
+}
+
+function blobToken() {
+  const t = process.env.BLOB_READ_WRITE_TOKEN;
+  if (!t) throw new Error("Storage unavailable");
+  return t;
+}
+
+function metaPath(id: string) {
+  return `${localMediaPath(id)}.meta.json`;
+}
+
+async function readMeta(id: string) {
+  try {
+    const raw = await readFile(metaPath(id), "utf8");
+    return JSON.parse(raw) as { contentType?: string };
+  } catch {
+    return {};
+  }
+}
+
+function localBucket() {
+  return {
+    async put(
+      id: string,
+      body: ReadableStream<Uint8Array> | null,
+      opts?: PutOptions,
+    ) {
+      if (!body) throw new Error("Empty body");
+      await ensureDataDirs();
+      const path = localMediaPath(id);
+      await pipeline(Readable.fromWeb(body), createWriteStream(path));
+      await writeFile(
+        metaPath(id),
+        JSON.stringify({
+          contentType: opts?.httpMetadata?.contentType ?? "application/octet-stream",
+        }),
+      );
+    },
+    async delete(id: string) {
+      await unlink(localMediaPath(id)).catch(() => {});
+      await unlink(metaPath(id)).catch(() => {});
+    },
+    async head(id: string) {
+      try {
+        const info = await stat(localMediaPath(id));
+        const meta = await readMeta(id);
+        return {
+          size: info.size,
+          httpMetadata: { contentType: meta.contentType },
+        };
+      } catch {
+        return null;
+      }
+    },
+    async get(
+      id: string,
+      opts?: { range?: { offset: number; length: number } },
+    ) {
+      const filePath = localMediaPath(id);
+      try {
+        await stat(filePath);
+      } catch {
+        return null;
+      }
+      if (!opts?.range) {
+        const stream = createReadStream(filePath);
+        return { body: Readable.toWeb(stream) as ReadableStream<Uint8Array> };
+      }
+      const { offset, length } = opts.range;
+      const handle = await open(filePath, "r");
+      const stream = handle.createReadStream({ start: offset, end: offset + length - 1 });
+      return { body: Readable.toWeb(stream) as ReadableStream<Uint8Array> };
+    },
+  };
+}
+
+function vercelBucket() {
   return {
     async put(
       id: string,
@@ -21,17 +99,17 @@ export function bucket() {
       if (!body) throw new Error("Empty body");
       await put(id, body, {
         access: "public",
-        token: token(),
+        token: blobToken(),
         addRandomSuffix: false,
         contentType: opts?.httpMetadata?.contentType,
       });
     },
     async delete(id: string) {
-      await del(id, { token: token() });
+      await del(id, { token: blobToken() });
     },
     async head(id: string) {
       try {
-        const meta = await head(id, { token: token() });
+        const meta = await head(id, { token: blobToken() });
         if (!meta) return null;
         return {
           size: meta.size,
@@ -45,7 +123,7 @@ export function bucket() {
       id: string,
       opts?: { range?: { offset: number; length: number } },
     ) {
-      const meta = await head(id, { token: token() });
+      const meta = await head(id, { token: blobToken() });
       if (!meta) return null;
       const headers: Record<string, string> = {};
       if (opts?.range) {
@@ -57,4 +135,8 @@ export function bucket() {
       return { body: res.body };
     },
   };
+}
+
+export function bucket() {
+  return useVercelBlob() ? vercelBucket() : localBucket();
 }
